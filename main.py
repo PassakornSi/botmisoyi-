@@ -197,16 +197,20 @@ async def random_spell_task():
 @bot.event
 async def on_message(message):
     if message.author.bot:
-        return  # ไม่ตอบบอทเอง
+        return
 
     guild_id = message.guild.id if message.guild else None
     if guild_id in chatrooms:
         allowed_channel = chatrooms[guild_id]
         if message.channel.id != allowed_channel:
-            return  # ไม่ตอบถ้าไม่ใช่ channel ที่ตั้งไว้
+            return
 
-    await bot.process_commands(message)
-        
+    # ตรวจว่าข้อความเป็นคำสั่ง prefix หรือไม่ (เช่น เริ่มด้วย = หรือ prefix ที่ตั้งไว้)
+    prefix = get_prefix(bot, message)
+    if message.content.startswith(prefix):
+        await bot.process_commands(message)
+        return  # หลัง process command แล้ว return ทันที
+
     content = message.content.lower()
 
     if any(word in content for word in ["เหงา", "เศร้า", "เบื่อ", "ไม่มีใคร", "เหนื่อย", "ร้องไห้", "เสียใจ", "เฟล", "ผิดหวัง", "โดนด่า", "โดนแกล้ง", "โดนล้อ"]):
@@ -492,19 +496,14 @@ async def on_message(message):
         await message.channel.send(random.choice(random_thoughts))
         return
 
-    else:
-        fallback_responses = [
-            "บอทกำลังฟังอยู่นะคะ 😊",
-            "ว้าว น่าสนใจมากเลย!",
-            "พูดอีกก็ได้ค่ะ ฉันชอบฟัง~",
-            "ขอโทษนะคะ ฉันยังไม่เข้าใจดีเท่าไหร่ แต่ฉันอยู่ตรงนี้เสมอนะ 💬"
-            ]
-        await message.channel.send(random.choice(fallback_responses))
-        return
-
-        # สุดท้าย อย่าลืมเรียก process_commands เพื่อให้คำสั่ง @bot.command() ยังทำงานได้
-    await bot.process_commands(message)
-
+# fallback
+    fallback_responses = [
+        "บอทกำลังฟังอยู่นะคะ 😊",
+        "ว้าว น่าสนใจมากเลย!",
+        "พูดอีกก็ได้ค่ะ ฉันชอบฟัง~",
+        "ขอโทษนะคะ ฉันยังไม่เข้าใจดีเท่าไหร่ แต่ฉันอยู่ตรงนี้เสมอนะ 💬"
+    ]
+    await message.channel.send(random.choice(fallback_responses))
 
 
 @bot.command()
@@ -523,10 +522,10 @@ async def fortune(ctx):
     embed = discord.Embed(title=f"🃏 ไพ่ของท่านคือ: {card}", description=meaning, color=0x7b68ee)
     embed.set_image(url=image_url)
     embed.set_footer(text=f"ขอให้โชคดีนะคะ {ctx.author.display_name}")
-    last_fortune_date[user_id] = today  # ย้ายขึ้นมาก่อน return
     await ctx.send(embed=embed)
 
-    return
+    last_fortune_date[user_id] = today  # **ย้ายมาบรรทัดนี้หลังส่งผล**
+
 
 @bot.event
 async def on_ready():
