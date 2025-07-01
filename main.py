@@ -521,9 +521,10 @@ async def fortune(ctx):
     embed.set_footer(text=f"ขอให้โชคดีนะคะ {ctx.author.display_name}")
 
     await ctx.send(embed=embed)
-    return
 
-    last_fortune_date[user_id] = today
+    last_fortune_date[user_id] = today  # ย้ายขึ้นมาก่อน return
+
+    return
 
 @bot.event
 async def on_ready():
