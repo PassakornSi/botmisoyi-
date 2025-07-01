@@ -199,22 +199,25 @@ async def on_message(message):
     if message.author.bot:
         return
 
+    # ----- 1. ตรวจสอบคำสั่ง (prefix) -----
+    prefix = get_prefix(bot, message)
+    if message.content.startswith(prefix):
+        await bot.process_commands(message)
+        return  # ให้รันคำสั่งได้จากทุกห้อง
+
+    # ----- 2. เงื่อนไขการ "พูดคุยเอง" -----
     guild_id = message.guild.id if message.guild else None
-    # ถ้าไม่มี guild หรือ guild นี้ยังไม่ตั้งห้องไว้ให้ตอบ
+
+    # ถ้าไม่ใช่ guild หรือยังไม่ได้ตั้ง chatroom —> ไม่ให้พูดคุยเอง
     if not guild_id or guild_id not in chatrooms:
         return
 
     allowed_channel = chatrooms[guild_id]
     if message.channel.id != allowed_channel:
-        return
-
-    prefix = get_prefix(bot, message)
-    if message.content.startswith(prefix):
-        await bot.process_commands(message)
-        return
+        return  # ถ้าไม่ใช่ห้องที่กำหนดไว้ —> ไม่พูดเอง
 
     content = message.content.lower()
-    
+
     if any(word in content for word in ["เหงา", "เศร้า", "เบื่อ", "ไม่มีใคร", "เหนื่อย", "ร้องไห้", "เสียใจ", "เฟล", "ผิดหวัง", "โดนด่า", "โดนแกล้ง", "โดนล้อ"]):
         replies = [
             "งือ... อย่าเพิ่งเสียใจนะคะ ฉันอยู่ตรงนี้เป็นเพื่อนคุณเสมอ 💖",
