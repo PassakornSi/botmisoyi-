@@ -200,19 +200,21 @@ async def on_message(message):
         return
 
     guild_id = message.guild.id if message.guild else None
-    if guild_id in chatrooms:
-        allowed_channel = chatrooms[guild_id]
-        if message.channel.id != allowed_channel:
-            return
+    # ถ้าไม่มี guild หรือ guild นี้ยังไม่ตั้งห้องไว้ให้ตอบ
+    if not guild_id or guild_id not in chatrooms:
+        return
 
-    # ตรวจว่าข้อความเป็นคำสั่ง prefix หรือไม่ (เช่น เริ่มด้วย = หรือ prefix ที่ตั้งไว้)
+    allowed_channel = chatrooms[guild_id]
+    if message.channel.id != allowed_channel:
+        return
+
     prefix = get_prefix(bot, message)
     if message.content.startswith(prefix):
         await bot.process_commands(message)
-        return  # หลัง process command แล้ว return ทันที
+        return
 
     content = message.content.lower()
-
+    
     if any(word in content for word in ["เหงา", "เศร้า", "เบื่อ", "ไม่มีใคร", "เหนื่อย", "ร้องไห้", "เสียใจ", "เฟล", "ผิดหวัง", "โดนด่า", "โดนแกล้ง", "โดนล้อ"]):
         replies = [
             "งือ... อย่าเพิ่งเสียใจนะคะ ฉันอยู่ตรงนี้เป็นเพื่อนคุณเสมอ 💖",
