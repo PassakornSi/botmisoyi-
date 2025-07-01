@@ -8,10 +8,9 @@ import json
 import os
 
 prefixes = {}
-chatrooms = {}
+chatrooms = {}  # เก็บ guild_id หรือ user_id กับ channel_id ที่ตั้งไว้
 last_fortune_date = {}
 last_spell_time = {}
-chatrooms = {}
 
 
 major_arcana = {
@@ -191,19 +190,22 @@ async def random_spell_task():
             f"ขอส่งเวทมนตร์นี้ให้ {tagged_member.mention}: **{spell}** 💫"
         )
         await channel.send(msg)
-        return
         last_spell_time[guild_id] = now
+        return
+
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
-        return
+    if message.author.bot:
+        return  # ไม่ตอบบอทเอง
 
-    if message.guild is None:
-        return
+    guild_id = message.guild.id if message.guild else None
+    if guild_id in chatrooms:
+        allowed_channel = chatrooms[guild_id]
+        if message.channel.id != allowed_channel:
+            return  # ไม่ตอบถ้าไม่ใช่ channel ที่ตั้งไว้
 
     await bot.process_commands(message)
-
         
     content = message.content.lower()
 
@@ -519,10 +521,8 @@ async def fortune(ctx):
     embed = discord.Embed(title=f"🃏 ไพ่ของท่านคือ: {card}", description=meaning, color=0x7b68ee)
     embed.set_image(url=image_url)
     embed.set_footer(text=f"ขอให้โชคดีนะคะ {ctx.author.display_name}")
-
-    await ctx.send(embed=embed)
-
     last_fortune_date[user_id] = today  # ย้ายขึ้นมาก่อน return
+    await ctx.send(embed=embed)
 
     return
 
