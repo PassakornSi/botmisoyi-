@@ -572,7 +572,6 @@ async def slash_help(interaction: discord.Interaction):
     await interaction.response.send_message(help_text)
     return
 
-load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
 server_on()
