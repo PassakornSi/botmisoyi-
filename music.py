@@ -42,41 +42,50 @@ class Music(commands.Cog):
     @app_commands.command(name="play", description="เล่นเพลงจาก URL หรือชื่อเพลง")
     @app_commands.describe(query="URL หรือชื่อเพลงที่ต้องการเล่น")
     async def play(self, interaction: Interaction, query: str):
-        await interaction.response.defer()  # แจ้งว่ากำลังโหลด
+        await interaction.response.defer()
 
-        # เช็คว่าผู้ใช้อยู่ในช่องเสียงไหม
         if not interaction.user.voice or not interaction.user.voice.channel:
             await interaction.followup.send("❌ คุณต้องอยู่ในช่องเสียงก่อนสั่งเล่นเพลงนะคะ!")
             return
 
         voice_channel = interaction.user.voice.channel
         guild = interaction.guild
-
-        # เช็คว่า bot อยู่ในช่องเสียงไหม ถ้าไม่อยู่ให้ join
         voice_client = guild.voice_client
         if voice_client is None:
             voice_client = await voice_channel.connect()
         elif voice_client.channel != voice_channel:
             await voice_client.move_to(voice_channel)
 
-        # ใช้ yt-dlp ดึงข้อมูลเพลง
+        # ✅ ใส่ ytdlp_opts ที่นี่เลย
         ytdlp_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
             'no_warnings': True,
-            'default_search': 'auto',
+            'default_search': 'ytsearch',
             'skip_download': True,
+            'noplaylist': True,
+            'socket_timeout': 10,
         }
 
-        ytdlp = yt_dlp.YoutubeDL(ytdlp_opts)
-        info = None
+        # ใช้ asyncio.wait_for ในการดึงข้อมูล
         try:
-            info = ytdlp.extract_info(query, download=False)
+            ytdlp = yt_dlp.YoutubeDL(ytdlp_opts)
+
+            # ✅ 2. ใช้ asyncio.wait_for จำกัดเวลาโหลด info
+            info = await asyncio.wait_for(
+                self.bot.loop.run_in_executor(None, lambda: ytdlp.extract_info(query, download=False)),
+                timeout=10  # วินาทีที่อนุญาต
+            )
+
             if 'entries' in info:
                 info = info['entries'][0]
-        except Exception as e:
-            await interaction.followup.send(f"❌ หาเพลงไม่เจอ: {e}")
+        except asyncio.TimeoutError:
+            await interaction.followup.send("⏱️ โหลดข้อมูลนานเกินไป กรุณาลองใหม่อีกครั้งค่ะ")
             return
+        except Exception as e:
+            await interaction.followup.send(f"❌ หาเพลงไม่เจอหรือเกิดข้อผิดพลาด: {e}")
+            return
+
 
         url = info['url']
         title = info.get('title', 'Unknown title')
@@ -132,3 +141,5 @@ class Music(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Music(bot))
+
+
