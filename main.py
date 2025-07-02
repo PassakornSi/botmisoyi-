@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from music import Music
 import json
 import os
-import asyncio
 
 chatrooms = {}
 last_fortune_date = {}
@@ -146,7 +145,7 @@ def save_chatrooms():
 @bot.event
 async def on_ready():
     await bot.add_cog(Music(bot))
-    await bot.tree.sync(guild=discord.Object(id=YOUR_GUILD_ID))
+    await bot.tree.sync()
     print("Slash ready:", [c.name for c in bot.tree.walk_commands()])
     random_spell_task.start()
 
