@@ -3,14 +3,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from myserver import server_on
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from music import Music
 import json
 import os
+from dotenv import load_dotenv
+import asyncio
 
 chatrooms = {}
 last_fortune_date = {}
 last_spell_time = {}
+
 
 major_arcana = {
     "The Fool": {
@@ -120,7 +123,12 @@ spells = [
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
-bot = commands.Bot(command_prefix=commands.when_mentioned_or('/'), intents=intents, command_prefix=None)
+
+bot = commands.Bot(
+    command_prefix=commands.when_mentioned_or('/'),
+    intents=intents,
+    application_id=1389220201865809940  # ใช้เลข client id ของบอทคุณ
+)
 
 CHATROOM_FILE = 'chatrooms.json'
 
@@ -144,9 +152,8 @@ def save_chatrooms():
 
 @bot.event
 async def on_ready():
-    await bot.add_cog(Music(bot))
+    print(f'Logged in as {bot.user}')
     await bot.tree.sync()
-    print("Slash ready:", [c.name for c in bot.tree.walk_commands()])
     random_spell_task.start()
 
 @bot.tree.command(name="setchatroom", description="ตั้งห้องที่บอทจะใช้พูดโต้ตอบ (เฉพาะแอดมิน)")
@@ -162,7 +169,7 @@ async def slash_setchatroom(interaction: discord.Interaction, channel: discord.T
 
 @tasks.loop(minutes=30)
 async def random_spell_task():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for guild_id, channel_id in chatrooms.items():
         last_time = last_spell_time.get(guild_id)
         if last_time and (now - last_time) < timedelta(hours=72):  
@@ -566,10 +573,16 @@ async def slash_help(interaction: discord.Interaction):
     await interaction.response.send_message(help_text)
     return
 
+load_dotenv()
+TOKEN = os.getenv("TOKEN")
+
 server_on()
 
 async def main():
-    await bot.start("TOKEN")
+    async with bot:
+        await bot.load_extension("music")  # โหลด cog เพลง
+        await bot.start(os.getenv("TOKEN"))
+
 
 if __name__ == "__main__":
-    import asyncio; asyncio.run(main())
+    asyncio.run(main())
