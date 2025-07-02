@@ -5,15 +5,12 @@ from discord.ext import commands, tasks
 from myserver import server_on
 from datetime import datetime, timedelta
 from music import Music
-import re 
 import json
 import os
 
-
-chatrooms = {}  # เก็บ guild_id หรือ user_id กับ channel_id ที่ตั้งไว้
+chatrooms = {}
 last_fortune_date = {}
 last_spell_time = {}
-
 
 major_arcana = {
     "The Fool": {
@@ -122,31 +119,35 @@ spells = [
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='/', intents=intents, help_command=None)
-
-
+intents.voice_states = True
+bot = commands.Bot(command_prefix=commands.when_mentioned_or('/'), intents=intents)
 
 CHATROOM_FILE = 'chatrooms.json'
 
 def load_chatrooms():
     global chatrooms
-    if os.path.exists(CHATROOM_FILE):
-        with open(CHATROOM_FILE, 'r') as f:
+    if os.path.exists('chatrooms.json'):
+        with open('chatrooms.json', 'r') as f:
             data = json.load(f)
-            # แปลง key เป็น int
             chatrooms = {int(k): v for k, v in data.items()}
         print("✅ Loaded chatrooms:", chatrooms)
     else:
         print("ℹ️ chatrooms.json not found.")
 
-
 def save_chatrooms():
     try:
-        with open(CHATROOM_FILE, 'w') as f:
+        with open('chatrooms.json', 'w') as f:
             json.dump(chatrooms, f, indent=4)
         print("✅ Chatrooms saved.")
     except Exception as e:
         print(f"❌ Save error: {e}")
+
+@bot.event
+async def on_ready():
+    load_chatrooms()  # โหลด chatrooms ทุกครั้งที่บอทออนไลน์
+    await bot.add_cog(Music(bot))
+    await bot.tree.sync()
+    print(f'Logged in as {bot.user}')
 
 @bot.tree.command(name="setchatroom", description="ตั้งห้องที่บอทจะใช้พูดโต้ตอบ (เฉพาะแอดมิน)")
 @app_commands.describe(channel="เลือกห้องแชทที่ต้องการ")
@@ -197,11 +198,6 @@ async def random_spell_task():
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
-        return
-
-    # ✅ เอา block prefix command ออกทั้งหมด
-    # ไม่ต้อง check prefix / ไม่ต้อง process_commands แล้ว
 
     guild_id = message.guild.id if message.guild else None
     if not guild_id or guild_id not in chatrooms:
@@ -530,17 +526,6 @@ async def slash_fortune(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
     last_fortune_date[user_id] = today
-
-
-@bot.event
-async def on_ready():
-    load_chatrooms()
-    await bot.add_cog(Music(bot))   # <-- โหลดคำสั่งเพลงเข้า bot
-    await bot.tree.sync()           # <-- Sync Slash commands
-    print(f'✅ Bot is ready. Logged in as {bot.user}')
-    random_spell_task.start()
-
-from discord import app_commands
 
 @bot.tree.command(name="say", description="ให้บอทพูดแทนคุณ พร้อมแนบรูปได้")
 @app_commands.describe(message="ข้อความที่ให้บอทพูด", image_url="ลิงก์รูป (optional)")
