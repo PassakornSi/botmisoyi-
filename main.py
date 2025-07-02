@@ -538,7 +538,7 @@ async def on_ready():
     await bot.add_cog(Music(bot))   # <-- โหลดคำสั่งเพลงเข้า bot
     await bot.tree.sync()           # <-- Sync Slash commands
     print(f'✅ Bot is ready. Logged in as {bot.user}')
-    random_spell_task.start() r
+    random_spell_task.start()
 
 from discord import app_commands
 
