@@ -8,9 +8,10 @@ import json
 import os
 
 prefixes = {}
-chatrooms = {}  # เก็บ guild_id หรือ user_id กับ channel_id ที่ตั้งไว้
+chatrooms = {}
 last_fortune_date = {}
 last_spell_time = {}
+chatrooms = {}
 
 
 major_arcana = {
@@ -190,32 +191,20 @@ async def random_spell_task():
             f"ขอส่งเวทมนตร์นี้ให้ {tagged_member.mention}: **{spell}** 💫"
         )
         await channel.send(msg)
-        last_spell_time[guild_id] = now
         return
-
+        last_spell_time[guild_id] = now
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
+    if message.author == bot.user:
         return
 
-    # ----- 1. ตรวจสอบคำสั่ง (prefix) -----
-    prefix = get_prefix(bot, message)
-    if message.content.startswith(prefix):
-        await bot.process_commands(message)
-        return  # ให้รันคำสั่งได้จากทุกห้อง
-
-    # ----- 2. เงื่อนไขการ "พูดคุยเอง" -----
-    guild_id = message.guild.id if message.guild else None
-
-    # ถ้าไม่ใช่ guild หรือยังไม่ได้ตั้ง chatroom —> ไม่ให้พูดคุยเอง
-    if not guild_id or guild_id not in chatrooms:
+    if message.guild is None:
         return
 
-    allowed_channel = chatrooms[guild_id]
-    if message.channel.id != allowed_channel:
-        return  # ถ้าไม่ใช่ห้องที่กำหนดไว้ —> ไม่พูดเอง
+    await bot.process_commands(message)
 
+        
     content = message.content.lower()
 
     if any(word in content for word in ["เหงา", "เศร้า", "เบื่อ", "ไม่มีใคร", "เหนื่อย", "ร้องไห้", "เสียใจ", "เฟล", "ผิดหวัง", "โดนด่า", "โดนแกล้ง", "โดนล้อ"]):
@@ -478,7 +467,7 @@ async def on_message(message):
         await message.channel.send(random.choice(replies))
         return
 
-    elif any(word in content for word in ["ใช่", "ไม่", "โอเค", "ได้", "ช่าย", "ม่าย"]):
+    if any(word in content for word in ["ใช่", "ไม่", "โอเค", "ได้", "ช่าย", "ม่าย"]):
         replies = {
             "ใช่": ["ใช่ค่ะ!", "ถูกต้องเลยค่ะ!", "ใช่แล้วค่ะ 😊"],
             "ไม่": ["ไม่ใช่นะคะ?", "โอ๊ะ ไม่ใช่เหรอ?", "ไม่เป็นไรค่ะ"],
@@ -501,14 +490,17 @@ async def on_message(message):
         await message.channel.send(random.choice(random_thoughts))
         return
 
-# fallback
-    fallback_responses = [
-        "บอทกำลังฟังอยู่นะคะ 😊",
-        "ว้าว น่าสนใจมากเลย!",
-        "พูดอีกก็ได้ค่ะ ฉันชอบฟัง~",
-        "ขอโทษนะคะ ฉันยังไม่เข้าใจดีเท่าไหร่ แต่ฉันอยู่ตรงนี้เสมอนะ 💬"
-    ]
-    await message.channel.send(random.choice(fallback_responses))
+    else:
+    # ถ้าไม่เข้าเงื่อนไขคำตอบไหนเลย
+        fallback_responses = [
+            "บอทกำลังฟังอยู่นะคะ 😊",
+            "ว้าว น่าสนใจมากเลย!",
+            "พูดอีกก็ได้ค่ะ ฉันชอบฟัง~",
+            "ขอโทษนะคะ ฉันยังไม่เข้าใจดีเท่าไหร่ แต่ฉันอยู่ตรงนี้เสมอนะ 💬"
+        ]
+        await message.channel.send(random.choice(fallback_responses))
+        return
+
 
 
 @bot.command()
@@ -527,10 +519,11 @@ async def fortune(ctx):
     embed = discord.Embed(title=f"🃏 ไพ่ของท่านคือ: {card}", description=meaning, color=0x7b68ee)
     embed.set_image(url=image_url)
     embed.set_footer(text=f"ขอให้โชคดีนะคะ {ctx.author.display_name}")
+
     await ctx.send(embed=embed)
+    return
 
-    last_fortune_date[user_id] = today  # **ย้ายมาบรรทัดนี้หลังส่งผล**
-
+    last_fortune_date[user_id] = today
 
 @bot.event
 async def on_ready():
