@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from music import Music
 import json
 import os
+import asyncio
 
 chatrooms = {}
 last_fortune_date = {}
@@ -120,7 +121,7 @@ spells = [
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
-bot = commands.Bot(command_prefix=commands.when_mentioned_or('/'), intents=intents)
+bot = commands.Bot(command_prefix=commands.when_mentioned_or('/'), intents=intents, command_prefix=None)
 
 CHATROOM_FILE = 'chatrooms.json'
 
@@ -144,10 +145,10 @@ def save_chatrooms():
 
 @bot.event
 async def on_ready():
-    load_chatrooms()  # โหลด chatrooms ทุกครั้งที่บอทออนไลน์
     await bot.add_cog(Music(bot))
-    await bot.tree.sync()
-    print(f'Logged in as {bot.user}')
+    await bot.tree.sync(guild=discord.Object(id=YOUR_GUILD_ID))
+    print("Slash ready:", [c.name for c in bot.tree.walk_commands()])
+    random_spell_task.start()
 
 @bot.tree.command(name="setchatroom", description="ตั้งห้องที่บอทจะใช้พูดโต้ตอบ (เฉพาะแอดมิน)")
 @app_commands.describe(channel="เลือกห้องแชทที่ต้องการ")
@@ -569,10 +570,7 @@ async def slash_help(interaction: discord.Interaction):
 server_on()
 
 async def main():
-    async with bot:
-        await bot.load_extension("music")
-        await bot.start(os.getenv("TOKEN"))
+    await bot.start("TOKEN")
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    import asyncio; asyncio.run(main())
