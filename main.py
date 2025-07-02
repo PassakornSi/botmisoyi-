@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from music import Music
 import json
 import os
-from dotenv import load_dotenv
 import asyncio
 
 chatrooms = {}
