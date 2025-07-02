@@ -4,9 +4,6 @@ from discord import app_commands, Interaction
 import yt_dlp
 import asyncio
 
-async def setup(bot):
-    await bot.add_cog(Music(bot))
-    
 class MusicControlView(discord.ui.View):
     def __init__(self, music_cog):
         super().__init__(timeout=None)
@@ -133,5 +130,5 @@ class Music(commands.Cog):
         if vc:
             await vc.disconnect()
 
-
-
+async def setup(bot):
+    await bot.add_cog(Music(bot))
