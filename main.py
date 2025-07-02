@@ -1,17 +1,18 @@
 import random
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 from myserver import server_on
 from datetime import datetime, timedelta
+from music import Music
 import re 
 import json
 import os
 
-prefixes = {}
-chatrooms = {}
+
+chatrooms = {}  # เก็บ guild_id หรือ user_id กับ channel_id ที่ตั้งไว้
 last_fortune_date = {}
 last_spell_time = {}
-chatrooms = {}
 
 
 major_arcana = {
@@ -118,13 +119,10 @@ spells = [
     "🌈 รุ้งกินน้ำแห่งความหวัง และการเริ่มต้นใหม่"
 ]
 
-def get_prefix(bot, message):
-    guild_id = message.guild.id if message.guild else None
-    return prefixes.get(guild_id, '=') 
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix=get_prefix, intents=intents, help_command=None)
+bot = commands.Bot(command_prefix='/', intents=intents, help_command=None)
 
 
 
@@ -150,12 +148,14 @@ def save_chatrooms():
     except Exception as e:
         print(f"❌ Save error: {e}")
 
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def setchatroom(ctx, channel: discord.TextChannel):
-    chatrooms[ctx.guild.id] = channel.id
+@bot.tree.command(name="setchatroom", description="ตั้งห้องที่บอทจะใช้พูดโต้ตอบ (เฉพาะแอดมิน)")
+@app_commands.describe(channel="เลือกห้องแชทที่ต้องการ")
+@app_commands.checks.has_permissions(administrator=True)
+async def slash_setchatroom(interaction: discord.Interaction, channel: discord.TextChannel):
+    guild_id = interaction.guild.id
+    chatrooms[guild_id] = channel.id
     save_chatrooms()
-    await ctx.send(f"✅ ตั้งห้องต้องมนตร์เป็น {channel.mention} เรียบร้อยเพคะ")
+    await interaction.response.send_message(f"✅ ตั้งห้องต้องมนตร์เป็น {channel.mention} เรียบร้อยเพคะ")
     return
 
 
@@ -191,20 +191,29 @@ async def random_spell_task():
             f"ขอส่งเวทมนตร์นี้ให้ {tagged_member.mention}: **{spell}** 💫"
         )
         await channel.send(msg)
-        return
         last_spell_time[guild_id] = now
+        return
+
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
+    if message.author.bot:
         return
 
-    if message.guild is None:
+    # ✅ เอา block prefix command ออกทั้งหมด
+    # ไม่ต้อง check prefix / ไม่ต้อง process_commands แล้ว
+
+    guild_id = message.guild.id if message.guild else None
+    if not guild_id or guild_id not in chatrooms:
         return
 
-    await bot.process_commands(message)
+    if message.channel.id != chatrooms[guild_id]:
+        return
 
-        
+    allowed_channel = chatrooms[guild_id]
+    if message.channel.id != allowed_channel:
+        return  # ถ้าไม่ใช่ห้องที่กำหนดไว้ —> ไม่พูดเอง
+
     content = message.content.lower()
 
     if any(word in content for word in ["เหงา", "เศร้า", "เบื่อ", "ไม่มีใคร", "เหนื่อย", "ร้องไห้", "เสียใจ", "เฟล", "ผิดหวัง", "โดนด่า", "โดนแกล้ง", "โดนล้อ"]):
@@ -467,7 +476,7 @@ async def on_message(message):
         await message.channel.send(random.choice(replies))
         return
 
-    if any(word in content for word in ["ใช่", "ไม่", "โอเค", "ได้", "ช่าย", "ม่าย"]):
+    elif any(word in content for word in ["ใช่", "ไม่", "โอเค", "ได้", "ช่าย", "ม่าย"]):
         replies = {
             "ใช่": ["ใช่ค่ะ!", "ถูกต้องเลยค่ะ!", "ใช่แล้วค่ะ 😊"],
             "ไม่": ["ไม่ใช่นะคะ?", "โอ๊ะ ไม่ใช่เหรอ?", "ไม่เป็นไรค่ะ"],
@@ -490,26 +499,25 @@ async def on_message(message):
         await message.channel.send(random.choice(random_thoughts))
         return
 
-    else:
-    # ถ้าไม่เข้าเงื่อนไขคำตอบไหนเลย
-        fallback_responses = [
-            "บอทกำลังฟังอยู่นะคะ 😊",
-            "ว้าว น่าสนใจมากเลย!",
-            "พูดอีกก็ได้ค่ะ ฉันชอบฟัง~",
-            "ขอโทษนะคะ ฉันยังไม่เข้าใจดีเท่าไหร่ แต่ฉันอยู่ตรงนี้เสมอนะ 💬"
-        ]
-        await message.channel.send(random.choice(fallback_responses))
-        return
+# fallback
+    fallback_responses = [
+        "บอทกำลังฟังอยู่นะคะ 😊",
+        "ว้าว น่าสนใจมากเลย!",
+        "พูดอีกก็ได้ค่ะ ฉันชอบฟัง~",
+        "ขอโทษนะคะ ฉันยังไม่เข้าใจดีเท่าไหร่ แต่ฉันอยู่ตรงนี้เสมอนะ 💬"
+    ]
+    await message.channel.send(random.choice(fallback_responses))
 
-
-
-@bot.command()
-async def fortune(ctx):
-    user_id = ctx.author.id
+@bot.tree.command(name="fortune", description="เปิดไพ่ทำนายโชคชะตา (ใช้ได้วันละครั้ง)")
+async def slash_fortune(interaction: discord.Interaction):
+    user_id = interaction.user.id
     today = datetime.utcnow().date()
 
     if user_id in last_fortune_date and last_fortune_date[user_id] == today:
-        await ctx.send(f"🕯️ ท่าน `{ctx.author.display_name}` ได้เปิดไพ่ทำนายไปแล้ววันนี้ กรุณารอกลับมาใหม่ในวันพรุ่งนี้นะเพคะ")
+        await interaction.response.send_message(
+            f"🕯️ ท่าน `{interaction.user.display_name}` ได้เปิดไพ่ทำนายไปแล้ววันนี้ กรุณารอกลับมาใหม่ในวันพรุ่งนี้นะเพคะ",
+            ephemeral=True
+        )
         return
 
     card = random.choice(list(major_arcana.keys()))
@@ -518,101 +526,68 @@ async def fortune(ctx):
 
     embed = discord.Embed(title=f"🃏 ไพ่ของท่านคือ: {card}", description=meaning, color=0x7b68ee)
     embed.set_image(url=image_url)
-    embed.set_footer(text=f"ขอให้โชคดีนะคะ {ctx.author.display_name}")
-
-    await ctx.send(embed=embed)
-    return
+    embed.set_footer(text=f"ขอให้โชคดีนะคะ {interaction.user.display_name}")
+    await interaction.response.send_message(embed=embed)
 
     last_fortune_date[user_id] = today
 
+
 @bot.event
 async def on_ready():
-    load_chatrooms()  # โหลด chatrooms ที่เคยตั้งไว้
+    load_chatrooms()
+    await bot.add_cog(Music(bot))   # <-- โหลดคำสั่งเพลงเข้า bot
+    await bot.tree.sync()           # <-- Sync Slash commands
     print(f'✅ Bot is ready. Logged in as {bot.user}')
-    random_spell_task.start()
+    random_spell_task.start() r
 
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def setprefix(ctx, prefix):
-    prefixes[ctx.guild.id] = prefix
-    await ctx.send(f'✅ Prefix set: `{prefix}`')
-    return
+from discord import app_commands
 
-@bot.command()
-async def checkprefix(ctx):
-    prefix = prefixes.get(ctx.guild.id, '!')
-    await ctx.send(f'📌 Current prefix: `{prefix}`')
-    return
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def resetprefix(ctx):
-    if ctx.guild.id in prefixes:
-        prefixes.pop(ctx.guild.id)
-        await ctx.send("♻️ Prefix reset to default: `!`")
-        return
-    else:
-        await ctx.send("❗ Prefix is already default (`!`)")
-        return
-
-@bot.command()
-async def say(ctx, *, message):
-    image_url = None
-
-    # ปรับ regex เพื่อจับ URL รูปพร้อม query string ต่อท้าย
-    match = re.search(r'(https?://\S+\.(png|jpg|jpeg|gif)(\?\S*)?)', message)
-    if match:
-        image_url = match.group(1)
-        message = message.replace(image_url, '').strip()
-
-    embed = discord.Embed(
-        description=message if message else None,
-        color=0x8380eb
-    )
-    embed.set_footer(text=f"Say by {ctx.author}")
-
+@bot.tree.command(name="say", description="ให้บอทพูดแทนคุณ พร้อมแนบรูปได้")
+@app_commands.describe(message="ข้อความที่ให้บอทพูด", image_url="ลิงก์รูป (optional)")
+async def slash_say(interaction: discord.Interaction, message: str, image_url: str = None):
+    embed = discord.Embed(description=message, color=0x8380eb)
+    embed.set_footer(text=f"Say by {interaction.user}")
     if image_url:
         embed.set_image(url=image_url)
 
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
     return
 
-@bot.command(aliases=['calc'])
-async def calculate(ctx, *, expression):
+@bot.tree.command(name="calc", description="คำนวณเลข บวก ลบ คูณ หาร")
+@app_commands.describe(expression="ตัวอย่าง: 2+3*(4-1)")
+async def slash_calc(interaction: discord.Interaction, expression: str):
     try:
-        # กรองแค่ตัวเลขและเครื่องหมาย + - * / ( ) เพื่อความปลอดภัย
         if not all(c in '0123456789+-*/(). ' for c in expression):
-            await ctx.send("ขอโทษค่ะ ฉันทำได้แค่บวก ลบ คูณ หาร นะคะ 🧮✨")
+            await interaction.response.send_message("ขอโทษค่ะ ฉันทำได้แค่บวก ลบ คูณ หาร นะคะ 🧮✨", ephemeral=True)
             return
 
         result = eval(expression)
         reply = f"ฮึบ! ข้าจะคำนวณให้เองนะ! `{expression}` = **{result}** 🧙‍♀️✨"
-        await ctx.send(reply)
-        return
+        await interaction.response.send_message(reply)
     except Exception:
-        await ctx.send("โอ๊ะ... มีอะไรผิดพลาดหรือเปล่านะ? ลองใหม่อีกครั้งสิคะ 🪄")
+        await interaction.response.send_message("โอ๊ะ... มีอะไรผิดพลาดหรือเปล่านะ? ลองใหม่อีกครั้งสิคะ 🪄")
         return
         
-@bot.command()
-async def help(ctx):
-    prefix = prefixes.get(ctx.guild.id, '!')
+@bot.tree.command(name="help", description="แสดงคำสั่งทั้งหมดที่สามารถใช้ได้")
+async def slash_help(interaction: discord.Interaction):
     help_text = (
-        f"🌸 สวัสดีค่ะ นี่คือคำสั่งที่เจ้าสามารถใช้ได้ในเซิร์ฟเวอร์นี้:\n\n"
-        f"📜 คำสั่งทั่วไป:\n"
-        f"🔮 `{prefix}fortune` — เปิดไพ่ทำนายโชคชะตาแบบเวทมนตร์ (ใช้ได้วันละครั้ง)\n"
-        f"💬 `{prefix}say <ข้อความ> [ลิงก์รูป]` — ให้ฉันพูดแทนเจ้าพร้อมแสดงรูปภาพ\n"
-        f"🧮 `{prefix}calculate <นิพจน์คณิตศาสตร์>` — คำนวณเลขบวก ลบ คูณ หาร เช่น `{prefix}calculate 2+3*4`\n\n"
-        f"🛠️ คำสั่งจัดการ prefix (สำหรับแอดมิน):\n"
-        f"• `{prefix}setprefix <prefix>` — ตั้งค่า prefix ใหม่สำหรับเซิร์ฟนี้\n"
-        f"• `{prefix}checkprefix` — ตรวจสอบ prefix ปัจจุบัน\n"
-        f"• `{prefix}resetprefix` — รีเซ็ต prefix เป็นค่าเริ่มต้น\n\n"
-        f"🪄 คำสั่งจัดการเวทมนตร์ (สำหรับแอดมิน):\n"
-        f"• `{prefix}setchatroom #channel` — ตั้งห้องที่จะให้บอทสุ่มเวทมนตร์\n\n"
-        f"✨ หากอยากรู้คำทำนายหรือเวทมนตร์ใด ๆ ก็ถามฉันได้เลยนะคะ 💫"
+        f"🌸 คำสั่งเวทมนตร์ทั้งหมดของฉันมีดังนี้:\n\n"
+        f"🔮 `/fortune` — เปิดไพ่ทำนายโชคชะตา (วันละครั้ง)\n"
+        f"💬 `/say` — ให้ฉันพูดแทนเจ้าพร้อมแนบรูปได้\n"
+        f"🧮 `/calculate` — คำนวณเลขง่าย ๆ เช่น 2+3*4\n"
+        f"🛠️ `/setchatroom` — ตั้งห้องที่ให้ฉันพูดคุยได้ (แอดมินเท่านั้น)\n\n"
+        f"✨ ถ้าอยากให้ฉันพูดคุยตอบเอง ก็แค่ตั้งห้องด้วย `/setchatroom` นะคะ!"
     )
-    await ctx.send(help_text)
+    await interaction.response.send_message(help_text)
     return
 
 server_on()
 
-bot.run(os.getenv('TOKEN'))
+async def main():
+    async with bot:
+        await bot.load_extension("music")
+        await bot.start(os.getenv("TOKEN"))
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
