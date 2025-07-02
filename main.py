@@ -3,10 +3,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from myserver import server_on
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from music import Music
 import json
 import os
+from dotenv import load_dotenv
 import asyncio
 
 chatrooms = {}
@@ -204,6 +205,8 @@ async def random_spell_task():
 
 @bot.event
 async def on_message(message):
+    if message.author.id == bot.user.id:
+        return
 
     guild_id = message.guild.id if message.guild else None
     if not guild_id or guild_id not in chatrooms:
@@ -572,6 +575,7 @@ async def slash_help(interaction: discord.Interaction):
     await interaction.response.send_message(help_text)
     return
 
+load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
 server_on()
