@@ -9,12 +9,12 @@ class MusicControlView(discord.ui.View):
         super().__init__(timeout=None)
         self.music_cog = music_cog
 
-    @discord.ui.button(label="⏸️ Pause", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="⏸️ Pause", style=discord.ButtonStyle.secondary)
     async def pause_button(self, interaction: Interaction, button: discord.ui.Button):
         await self.music_cog.pause(interaction)
         await interaction.response.send_message("⏸️ เพลงหยุดชั่วคราว", ephemeral=True)
 
-    @discord.ui.button(label="▶️ Resume", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="▶️ Resume", style=discord.ButtonStyle.secondary)
     async def resume_button(self, interaction: Interaction, button: discord.ui.Button):
         await self.music_cog.resume(interaction)
         await interaction.response.send_message("▶️ เล่นเพลงต่อ", ephemeral=True)
@@ -24,7 +24,7 @@ class MusicControlView(discord.ui.View):
         await self.music_cog.skip(interaction)
         await interaction.response.send_message("⏭️ ข้ามเพลง", ephemeral=True)
 
-    @discord.ui.button(label="⏹️ Leave", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="⏹️ Leave", style=discord.ButtonStyle.secondary)
     async def leave_button(self, interaction: Interaction, button: discord.ui.Button):
         await self.music_cog.leave(interaction)
         await interaction.response.send_message("⏹️ ออกจากช่องเสียงแล้ว", ephemeral=True)
@@ -64,28 +64,25 @@ class Music(commands.Cog):
             'default_search': 'ytsearch',
             'skip_download': True,
             'noplaylist': True,
-            'socket_timeout': 10,
+            'socket_timeout': 10
         }
 
-        # ใช้ asyncio.wait_for ในการดึงข้อมูล
         try:
             ytdlp = yt_dlp.YoutubeDL(ytdlp_opts)
 
-            # ✅ 2. ใช้ asyncio.wait_for จำกัดเวลาโหลด info
             info = await asyncio.wait_for(
                 self.bot.loop.run_in_executor(None, lambda: ytdlp.extract_info(query, download=False)),
-                timeout=10  # วินาทีที่อนุญาต
+                timeout=30
             )
 
             if 'entries' in info:
                 info = info['entries'][0]
         except asyncio.TimeoutError:
-            await interaction.followup.send("⏱️ โหลดข้อมูลนานเกินไป กรุณาลองใหม่อีกครั้งค่ะ")
+            await interaction.followup.send("⏱️ โหลดข้อมูลเพลงนานเกินไป กรุณาลองใหม่ค่ะ")
             return
         except Exception as e:
-            await interaction.followup.send(f"❌ หาเพลงไม่เจอหรือเกิดข้อผิดพลาด: {e}")
+            await interaction.followup.send(f"❌ เกิดข้อผิดพลาด: {e}")
             return
-
 
         url = info['url']
         title = info.get('title', 'Unknown title')
@@ -95,7 +92,12 @@ class Music(commands.Cog):
         thumbnail = info.get('thumbnail', None)
 
         # สร้าง source สำหรับเล่นเสียง
-        source = discord.FFmpegPCMAudio(url, before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
+        source = discord.FFmpegPCMAudio(
+            url,
+            executable=r"C:\Users\ASUS\Downloads\ffmpeg-7.1.1-essentials_build\ffmpeg-7.1.1-essentials_build\bin\ffmpeg.exe",
+            before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+        )
+
 
         # เล่นเพลง
         if voice_client.is_playing():
@@ -105,14 +107,18 @@ class Music(commands.Cog):
 
         # สร้าง Embed สวย ๆ
         embed = discord.Embed(
-            title=f"🎵 กำลังเล่นเพลง: {title}",
-            description=f"⏳ ความยาว: {duration_str}",
-            color=0x1DB954  # สีเขียว Spotify-like
+            title="🎵 กำลังเล่นเพลง",
+            description=f"**{title}**\n\n⏳ ความยาว: `{duration_str}`",
+            color=0xD8B4F8  # ม่วงอ่อน
         )
+
         if webpage_url:
             embed.url = webpage_url
         if thumbnail:
             embed.set_thumbnail(url=thumbnail)
+
+        embed.set_footer(text="โดย Misoyi Bot • 💜")
+
 
         # สร้าง view ปุ่ม
         view = MusicControlView(self)
