@@ -2,6 +2,7 @@ import random
 import discord
 from discord import app_commands, Interaction
 from discord.ext import commands, tasks
+from fortune import Fortune
 from myserver import server_on
 from datetime import datetime, timezone, timedelta
 from music import Music
@@ -444,50 +445,6 @@ async def on_message(message):
         "ขอโทษนะคะ ฉันยังไม่เข้าใจดีเท่าไหร่ แต่ฉันอยู่ตรงนี้เสมอนะ 💬"
     ]
     await message.channel.send(random.choice(fallback_responses))
-
-class Fortune(commands.Cog): 
-    def __init__(self, bot):
-        self.bot = bot
-
-    @app_commands.command(name="fortune", description="ทำนายดวงด้วยไพ่ทาโรต์")
-    async def fortune(self, interaction: Interaction):
-        user_id = interaction.user.id
-        today = datetime.utcnow().date()
-
-        # เช็คว่าผู้ใช้ทำนายวันนี้ไปแล้วหรือยัง
-        if user_id in last_fortune_date and last_fortune_date[user_id] == today:
-            await interaction.response.send_message(
-                f"🕯️ ท่าน `{interaction.user.display_name}` ได้เปิดไพ่ทำนายไปแล้ววันนี้ กรุณารอกลับมาใหม่ในวันพรุ่งนี้นะเพคะ",
-                ephemeral=True
-            )
-            return
-        
-        # บันทึกวันที่ทำนายล่าสุด
-        last_fortune_date[user_id] = today
-
-        # เลือกไพ่ทำนาย
-        card = random.choice(list(major_arcana.keys()))
-        info = major_arcana[card]
-        core_meaning = info["meaning"]  # ความหมายหลัก
-        detail = info["detailed"]
-        advice = info.get("advice", "ขอให้โชคดีนะคะ 🌟")
-
-        # สร้าง embed
-        embed = discord.Embed(
-            title=f"🔮 ไพ่ทำนาย: {card}",
-            description=f"**{core_meaning}**",
-            color=0xA67ACC  # สีม่วงโทนอ่อน
-        )
-
-        embed.add_field(name="🕰️ อดีต", value=detail["past"], inline=False)
-        embed.add_field(name="⏳ ปัจจุบัน", value=detail["present"], inline=False)
-        embed.add_field(name="🔮 อนาคต", value=detail["future"], inline=False)
-        embed.add_field(name="💰 การเงิน", value=detail["finance"], inline=False)
-        embed.add_field(name="💼 การงาน", value=detail["career"], inline=False)
-        embed.add_field(name="❤️ ความรัก", value=detail["love"], inline=False)
-        embed.add_field(name="✨ คำแนะนำ", value=advice, inline=False)
-
-        await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="calc", description="คำนวณเลข บวก ลบ คูณ หาร")
 @app_commands.describe(expression="ตัวอย่าง: 2+3*(4-1)")
