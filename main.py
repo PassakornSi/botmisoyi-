@@ -8,7 +8,6 @@ from datetime import datetime, timezone, timedelta
 from music import Music
 import json
 import os
-from dotenv import load_dotenv
 import asyncio
 import discord.opus
 from tarot_data import major_arcana
@@ -468,7 +467,6 @@ async def slash_help(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
     return
 
-load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
 server_on()
